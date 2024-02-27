@@ -9,18 +9,39 @@ from cryptography.fernet import Fernet
 from django.shortcuts import render
 from django.views import generic
 from .models import Post
+from django.http import HttpResponseForbidden
+from django.contrib.auth.mixins import LoginRequiredMixin
 
+def superuser_required(function=None):
+    actual_decorator = user_passes_test(
+        lambda u: u.is_active and u.is_superuser,
+        login_url='/login/?next=' + reverse_lazy('login')
+    )
+    if function:
+        return actual_decorator(function)
+    return actual_decorator
 class PostDetail(generic.DetailView):
     model = Post
     template_name = 'post_detail.html'
 
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     post = self.get_object()
+    #     decrypted_content = post.decrypt_content()
+    #     context['decrypted_content'] = decrypted_content
+    #     return context
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         post = self.get_object()
-        decrypted_content = post.decrypt_content()
-        context['decrypted_content'] = decrypted_content
-        return context
 
+        # Check if the user is a superuser or the author of the post
+        if self.request.user.is_superuser or self.request.user == post.author:
+            decrypted_content = post.decrypt_content()
+            context['decrypted_content'] = decrypted_content
+        else:
+            context['decrypted_content'] = None  # Hide content for regular users
+
+        return context
 class CustomLoginView(LoginView):
     template_name = 'login.html'
 
