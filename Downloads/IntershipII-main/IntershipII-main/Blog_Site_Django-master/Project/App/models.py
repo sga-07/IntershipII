@@ -40,6 +40,23 @@ class Post(models.Model):
             return decrypted_content
         return ""
 
+class UserActivity(models.Model):
+    id = models.BigAutoField(primary_key=True)  # Specify primary key
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    activity_type = models.CharField(max_length=10)  # 'login' or 'logout'
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+# Signal handler to create user profile
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(user=instance)
+
+# Signal handler to save user profile
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    instance.userprofile.save()
+
 from django.utils import timezone
 
 class MyModel(models.Model):

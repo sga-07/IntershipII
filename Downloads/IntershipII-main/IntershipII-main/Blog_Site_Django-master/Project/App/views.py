@@ -9,39 +9,30 @@ from cryptography.fernet import Fernet
 from django.shortcuts import render
 from django.views import generic
 from .models import Post
-from django.http import HttpResponseForbidden
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import UserPassesTestMixin
 
-def superuser_required(function=None):
-    actual_decorator = user_passes_test(
-        lambda u: u.is_active and u.is_superuser,
-        login_url='/login/?next=' + reverse_lazy('login')
-    )
-    if function:
-        return actual_decorator(function)
-    return actual_decorator
-class PostDetail(generic.DetailView):
+class PostDetail(UserPassesTestMixin, generic.DetailView):
     model = Post
     template_name = 'post_detail.html'
 
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     post = self.get_object()
-    #     decrypted_content = post.decrypt_content()
-    #     context['decrypted_content'] = decrypted_content
-    #     return context
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         post = self.get_object()
-
-        # Check if the user is a superuser or the author of the post
-        if self.request.user.is_superuser or self.request.user == post.author:
-            decrypted_content = post.decrypt_content()
-            context['decrypted_content'] = decrypted_content
-        else:
-            context['decrypted_content'] = None  # Hide content for regular users
-
+        decrypted_content = post.decrypt_content()
+        context['decrypted_content'] = decrypted_content
         return context
+
+    def test_func(self):
+        # Check if the logged-in user is a superuser
+        if self.request.user.is_superuser:
+            return True
+        else:
+            post = self.get_object()
+            # Check if the post author is a superuser
+            if post.author.is_superuser:
+                return False
+            return True
+
 class CustomLoginView(LoginView):
     template_name = 'login.html'
 
@@ -74,3 +65,40 @@ def secure(request):
 #         # Decrypt content for the post
 #         obj.content = obj.decrypt_content()
 #         return obj
+
+from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import Post, UserActivity
+
+
+# Function to print users who logged in and users who created posts
+def print_login_and_post_creator_users():
+    # Get all login activities
+    login_activities = UserActivity.objects.filter(activity_type='login')
+
+    print("Users who logged in:")
+    for activity in login_activities:
+        print(activity.user.username)
+
+    print("\nUsers who created posts:")
+    post_creators = User.objects.filter(blog_posts__isnull=False).distinct()
+    for user in post_creators:
+        print(user.username)
+
+
+# View to display posts
+from django.shortcuts import render
+
+
+def post_list(request):
+    print_login_and_post_creator_users()  # Print users who logged in and post creators
+    posts = Post.objects.filter(status=1).order_by('-created_on')
+    return render(request, 'post_list.html', {'posts': posts})
+
+
+# Signal handler to print users when a post is created
+@receiver(post_save, sender=Post)
+def print_users_on_post_creation(sender, instance, created, **kwargs):
+    if created:
+        print_login_and_post_creator_users()
