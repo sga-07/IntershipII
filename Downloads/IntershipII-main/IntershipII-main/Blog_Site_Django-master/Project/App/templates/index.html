@@ -6,7 +6,7 @@
     <div class="row">
       <div class=" col-md-8 col-md-10 mx-auto">
         <div class="site-heading">
-          <h3 class=" site-heading my-4 mt-3 text-black"> Welcome to My Blog ✍️ </h3>
+          <h3 class="site-heading my-4 mt-3 text-black"> Welcome to My Blog ✍️ </h3>
           <p class="text-dark">Django is Awesome ✨✨✨ </p>
         </div>
       </div>
@@ -21,16 +21,18 @@
       <div class="card mb-4">
         <div class="card-body">
           <h2 class="card-title">{{ post.title }}</h2>
-          <p class="card-text text-muted h6">{{ post.author }} | {{ post.created_on}} </p>
-          <p class="card-text">{{post.content|slice:":200"}}</p>
-          <a href="{% url 'post_detail' post.slug  %}" class="btn btn-primary">Read More &rarr;</a>
+          {% if post.author == request.user %}
+          <p class="card-text text-muted">Author: {{ post.author }} | Created On: {{ post.created_on }}</p>
+          {% endif %}
+          <p class="card-text">{{ post.content|slice:":200" }}</p>
+          <a href="{% url 'post_detail' post.slug %}" class="btn btn-primary">Read More &rarr;</a>
         </div>
       </div>
       {% endfor %}
     </div>
-    {% block sidebar %} 
-    {% include 'sidebar.html' %} 
+    {% block sidebar %}
+    {% include 'sidebar.html' %}
     {% endblock sidebar %}
   </div>
 </div>
-{%endblock%}
+{% endblock %}
